@@ -8,3 +8,4 @@ An update on InanZen's AutoBossSpawner plugin.
 - /abtoggle
 - /abreload
 
+Simply create a region called arena.
