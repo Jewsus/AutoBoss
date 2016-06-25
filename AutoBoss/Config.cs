@@ -1,6 +1,6 @@
-﻿using System;
-using System.IO;
+using System;
 using System.Collections.Generic;
+using System.IO;
 using Newtonsoft.Json;
 
 namespace AutoBoss
@@ -23,7 +23,7 @@ namespace AutoBoss
             this.bosses = bosses;
         }
     }
-    public class ABconfig
+    public class ABConfig
     {
         public int BossTimer = 30;
         public string BossText = "Nightly Boss battle in Arena starting in 30 seconds";
@@ -36,21 +36,21 @@ namespace AutoBoss
         public int[] MinionsList = { 2, 6, 16, 23, 24, 28, 29, 31, 32, 34, 42, 44, 45, 48, 59, 60, 62, 71, 75, 77, 78, 81, 82, 83, 84, 85, 86, 93, 104, 110, 111, 120, 121, 122, 133, 137, 138, 140, 141, 143, 144 };
         public List<BossSet> BossList;
 
-        public static ABconfig Read(string path)
+        public static ABConfig Read(string path)
         {
             if (!File.Exists(path))
-                return new ABconfig();
+                return new ABConfig();
             using (var fs = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read))
             {
                 return Read(fs);
             }
         }
 
-        public static ABconfig Read(Stream stream)
+        public static ABConfig Read(Stream stream)
         {
             using (var sr = new StreamReader(stream))
             {
-                var cf = JsonConvert.DeserializeObject<ABconfig>(sr.ReadToEnd());
+                var cf = JsonConvert.DeserializeObject<ABConfig>(sr.ReadToEnd());
                 if (ConfigRead != null)
                     ConfigRead(cf);
                 return cf;
@@ -104,6 +104,6 @@ namespace AutoBoss
                 sw.Write(str);
             }
         }
-        public static Action<ABconfig> ConfigRead;
+        public static Action<ABConfig> ConfigRead;
     }
 }
