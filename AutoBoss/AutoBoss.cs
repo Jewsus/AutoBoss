@@ -1,41 +1,41 @@
-﻿using Terraria;
-using System;
-using System.IO;
 using System.Collections.Generic;
-using TShockAPI;
+using System.IO;
+using System;
+using System.Reflection;
+using Terraria;
 using TerrariaApi.Server;
+using TShockAPI;
 
 namespace AutoBoss
 {
     [ApiVersion(1, 23)]
     public class AutoBoss : TerrariaPlugin
     {
+        public ABConfig configObj { get; set; }
+        public Player[] Players { get; set; }
+        internal static string ABConfigPath { get { return Path.Combine(TShock.SavePath, "AutoBossConfig.json"); } }
+        private TShockAPI.DB.Region arenaregion = new TShockAPI.DB.Region();
         private DateTime LastCheck = DateTime.UtcNow;
         private DateTime OtherLastCheck = DateTime.UtcNow;
-        public ABconfig configObj { get; set; }
-        internal static string ABconfigPath { get { return Path.Combine(TShock.SavePath, "ABconfig.json"); } }
-        private TShockAPI.DB.Region arenaregion = new TShockAPI.DB.Region();
         private int BossTimer = 30;
         private List<NPC> bossList = new List<NPC>();
         private bool BossToggle = false;
         Random rndGen = new Random();
-
-
         public override string Name
         {
             get { return "AutoBoss"; }
         }
         public override string Author
         {
-            get { return "by Jewsus"; }
+            get { return "Jewsus"; }
         }
         public override string Description
         {
-            get { return "Auto spawn bosses every night"; }
+            get { return "AutoBoss Plugin"; }
         }
         public override Version Version
         {
-            get { return new Version("1.0"); }
+            get { return Assembly.GetExecutingAssembly().GetName().Version; }
         }
         public override void Initialize()
         {
@@ -55,6 +55,38 @@ namespace AutoBoss
         {
             Order = 1;
         }
+        public void OnInitialize(EventArgs args)
+        {
+            configObj = new ABConfig();
+            SetupConfig();
+            Commands.ChatCommands.Add(new Command("autoboss", AutoBossToggle, "abtoggle"));
+            Commands.ChatCommands.Add(new Command("autoboss", AutoBossReload, "abreload"));
+            //Commands.ChatCommands.Add(new Command("autoboss", ABdebug, "absdebug"));
+        }
+        public void AutoBossToggle(CommandArgs args)
+        {
+            BossToggle = !BossToggle;
+            if (BossToggle == true)
+            {
+                foreach (TShockAPI.DB.Region reg in TShock.Regions.ListAllRegions(Main.worldID.ToString()))
+                {
+                    if (reg.Name == "arena") { arenaregion = reg; }
+                }
+                if (arenaregion.Name != "arena") { TShock.Utils.Broadcast("Error: Region 'arena' is not defined.", Color.Red); BossToggle = false; }
+            }
+            args.Player.SendSuccessMessage("Boss battles now: " + ((BossToggle) ? "Enabled" : "Disabled"));
+            BossTimer = configObj.BossTimer;
+        }
+        public void AutoBossReload(CommandArgs args)
+        {
+            SetupConfig();
+            args.Player.SendSuccessMessage("AutoBoss config reloaded.");
+        }
+        /*  public void ABdebug(CommandArgs args)
+          {
+              args.Player.SendMessage("arena x: " + arenaregion.Area.X);
+
+          }*/
         public void OnUpdate(EventArgs args)
         {
             if (BossToggle && ((DateTime.UtcNow - LastCheck).TotalSeconds >= 1))
@@ -104,7 +136,6 @@ namespace AutoBoss
                 }
             }
         }
-
         private void startBossBattle()
         {
             NPC npc = new NPC();
@@ -115,7 +146,7 @@ namespace AutoBoss
             BossSet bossSet = configObj.BossList[rndGen.Next(0, configObj.BossList.Count)];
             foreach (BossObj b in bossSet.bosses)
             {
-                npc = TShockAPI.TShock.Utils.GetNPCById(b.id);
+                npc = TShock.Utils.GetNPCById(b.id);
                 TSPlayer.Server.SpawnNPC(npc.type, npc.name, b.amt, arenaX, arenaY, 30, 30);
                 broadcastString += " " + b.amt + "x " + npc.name + " +";
             }
@@ -138,64 +169,29 @@ namespace AutoBoss
             TSPlayer.Server.SpawnNPC(npc.type, npc.name, henchmenNumber, arenaX, arenaY, 30, 30);
             if (configObj.MinionsAnnounce) { TShock.Utils.Broadcast("Spawning Boss Minions: " + henchmenNumber + "x " + npc.name + "!", Color.SteelBlue); }
         }
-
-        #region Commands
-        public void OnInitialize(EventArgs args)
-        {
-            configObj = new ABconfig();
-            SetupConfig();
-            Commands.ChatCommands.Add(new Command("autoboss", ABStoggle, "abtoggle"));
-            Commands.ChatCommands.Add(new Command("autoboss", ABSreload, "abreload"));
-            //Commands.ChatCommands.Add(new Command("autoboss", ABdebug, "absdebug"));
-        }
-
-        public void ABStoggle(CommandArgs args)
-        {
-            BossToggle = !BossToggle;
-            if (BossToggle == true)
-            {
-                foreach (TShockAPI.DB.Region reg in TShock.Regions.ListAllRegions(Main.worldID.ToString()))
-                {
-                    if (reg.Name == "arena") { arenaregion = reg; }
-                }
-                if (arenaregion.Name != "arena") { TShock.Utils.Broadcast("Error: Region 'arena' is not defined.", Color.Red); BossToggle = false; }
-            }
-            args.Player.SendSuccessMessage("Boss battles now: " + ((BossToggle) ? "Enabled" : "Disabled"));
-            BossTimer = configObj.BossTimer;
-        }
-        public void ABSreload(CommandArgs args)
-        {
-            SetupConfig();
-            args.Player.SendSuccessMessage("AutoBoss config reloaded.");
-        }
-        /*  public void ABdebug(CommandArgs args)
-          {
-              args.Player.SendMessage("arena x: " + arenaregion.Area.X);
-
-          }*/
-
-        #endregion
         public void SetupConfig()
         {
             try
             {
-                if (File.Exists(ABconfigPath))
+                if (File.Exists(ABConfigPath))
                 {
-                    configObj = new ABconfig();
-                    configObj = ABconfig.Read(ABconfigPath);
+                    configObj = new ABConfig();
+                    configObj = ABConfig.Read(ABConfigPath);
                     BossTimer = configObj.BossTimer;
                 }
-                else { configObj.Write(ABconfigPath); }
+                else
+                {
+                    configObj.Write(ABConfigPath);
+                }
             }
             catch (Exception ex)
             {
                 Console.ForegroundColor = ConsoleColor.Red;
-                Console.WriteLine("Error in config file");
+                Console.WriteLine("Error in AutoBoss config file");
                 Console.ForegroundColor = ConsoleColor.Gray;
-                TShock.Log.Error("Config Exception");
-                TShock.Log.Error(ex.ToString());
+                TShock.Log.ConsoleError("AutoBoss Config Exception");
+                TShock.Log.ConsoleError(ex.ToString());
             }
         }
     }
-
 }
